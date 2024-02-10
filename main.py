@@ -8,6 +8,17 @@ if 'approved' not in st.session_state:
     st.session_state['approved'] = []
 if 'rejected' not in st.session_state:
     st.session_state['rejected'] = []
+# Initialize session state for uploaded document if it doesn't exist
+if 'uploaded_word_doc' not in st.session_state:
+    st.session_state['uploaded_word_doc'] = None
+if 'uploaded_word_doc_name' not in st.session_state:
+    st.session_state['uploaded_word_doc_name'] = ""
+if 'completion' not in st.session_state:
+    st.session_state['completion'] = []
+if 'approved_completion' not in st.session_state:
+    st.session_state['approved_completion'] = []
+if 'edit_completion' not in st.session_state:
+    st.session_state['edit_completion'] = []
 
 def submit_proposal(proposal_data):
     # Here you would implement saving the proposal data to a database or another storage
@@ -75,12 +86,12 @@ def submit_proposal(proposal_data):
 def approve_proposal(index):
     proposal = st.session_state['proposals'].pop(index)
     st.session_state['approved'].append(proposal)
-    st.experimental_rerun()
+    st.rerun()
 
 def reject_proposal(index):
     proposal = st.session_state['proposals'].pop(index)
     st.session_state['rejected'].append(proposal)
-    st.experimental_rerun()
+    st.rerun()
 
 def pending_approval_page():
     if st.session_state['proposals']:
@@ -103,32 +114,121 @@ def show_rejected():
     df_rejected = pd.DataFrame(st.session_state.rejected)
     st.write(df_rejected)
 
+# Function to save the uploaded Word document to the session state
+def save_uploaded_file(uploaded_file):
+    if uploaded_file is not None:
+        # Read the file data into a bytes object
+        bytes_data = uploaded_file.read()
+        # Save the bytes data in the session state
+        st.session_state['uploaded_word_doc'] = bytes_data
+        st.session_state['uploaded_word_doc_name'] = uploaded_file.name
+        st.success(f"Uploaded {uploaded_file.name} successfully.")
+
+# Function to handle the project completion form
+def completion_form():
+    st.subheader("Project Completion Form")
+    with st.form(key='completion_form'):
+        # You can add other input fields as necessary
+        project_title = st.text_input("Paper Title")
+        video_link = st.text_input("Video Link")
+        github_repo = st.text_input("GitHub Repository")
+        project_website = st.text_input("Project Website Link if available")
+
+        # Word document upload field
+        uploaded_file = st.file_uploader("Upload your project document", type=['docx'])
+
+        # Form submission button
+        submit_button = st.form_submit_button(label='Submit')
+
+        if submit_button:
+            # Save the uploaded Word document when the form is submitted
+            save_uploaded_file(uploaded_file)
+            completion = {
+                "project title" : project_title,
+                "Video Link" : video_link,
+                "github repo" : github_repo,
+                "project website": project_website,
+                "Project Document" : uploaded_file.name
+            }
+            submit_completion(completion)
+
+
+            # You can add logic to save other form fields to the session state or a database
+
+def submit_completion(completion):
+    st.session_state['completion'].append(completion)
+    st.success("Project completion form submitted successfully!")
+
+def approve_completion(index):
+    completion = st.session_state['completion'].pop(index)
+    st.session_state['approved_completion'].append(completion)
+    st.rerun()
+def edit_completion(index):
+    completion = st.session_state['completion'].pop(index)
+    st.session_state['edit_completion'].append(completion)
+    st.rerun()
+def show_approved_completion():
+    df_approved = pd.DataFrame(st.session_state.approved_completion)
+    st.write(df_approved)
+def show_to_edit_completion():
+    df_edit = pd.DataFrame(st.session_state.edit_completion)
+    st.write(df_edit)
+
+
+
+
+def pending_completion():
+    if st.session_state['completion']:
+        for index, completion in enumerate(st.session_state['completion']):
+            st.write(completion)
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Yes", key=f"approve_{index}"):
+                    approve_completion(index)
+            with col2:
+                if st.button("Edit", key=f"reject_{index}"):
+                    edit_completion(index)
+    else:
+        st.write("No pending project completion forms")
+
+
 def main():
     st.title("Data Science Capstone Website")
-    page = st.selectbox("Navigate to:", ["Proposal Request", "Pending Approval", "Rejected", "Approved Projects", "Completion", "Pending Completion", "Completed Projects"], index=0)
+    page = st.selectbox("Navigate to:", ["Proposal Request", "Pending Approval", "Rejected", "Approved Projects", "Project Completion Form","Project completion aprroval", "Pending Completion", "Completed Projects"], index=0)
 
     if page == "Proposal Request":
         proposal_request_form()
     elif page == "Pending Approval":
         st.subheader("Pending Approval")
         pending_approval_page()
-        # Display approved proposals here
+   
     elif page == "Rejected":
         st.subheader("Rejected")
-        # Display past projects here
+        show_rejected()
+  
     elif page == "Approved Projects":
         st.subheader("Approved Projects")
-        # Display approval/rejection interface here
+    
         show_approved()
-    elif page == "Completion":
-        st.subheader("Completion")
-        # Display approval/rejection interface here
+    elif page == "Project Completion Form":
+        st.subheader("Project Completion Form")
+        completion_form()
+        # Display info about the uploaded file (if any)
+        if st.session_state['uploaded_word_doc'] is not None:
+            st.write(f"Uploaded Word document: {st.session_state['uploaded_word_doc_name']}")
+    elif page == "Project completion aprroval":
+        st.subheader("Project completion aprroval")
+        pending_completion()
+
     elif page == "Pending Completion":
         st.subheader("Pending Completion")
-        # Display approval/rejection interface here
+        show_to_edit_completion()
+  
+    
     elif page == "Completed Projects":
         st.subheader("Completed Projects")
-        # Display approval/rejection interface here
+        show_approved_completion()
+
 
 if __name__ == "__main__":
     main()
