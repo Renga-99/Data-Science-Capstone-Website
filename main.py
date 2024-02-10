@@ -4,6 +4,10 @@ import numpy as np
 # Initialize session state for storing proposals if it doesn't exist
 if 'proposals' not in st.session_state:
     st.session_state['proposals'] = []
+if 'approved' not in st.session_state:
+    st.session_state['approved'] = []
+if 'rejected' not in st.session_state:
+    st.session_state['rejected'] = []
 
 def submit_proposal(proposal_data):
     # Here you would implement saving the proposal data to a database or another storage
@@ -59,17 +63,45 @@ def proposal_request_form():
             # proposal_data = pd.DataFrame.from_dict(proposal_data, orient = "index")
             submit_proposal(proposal_data)
 # Function to display pending proposals
-def pending_approval_page():
-    st.subheader("Pending Approval")
-    
-    # Filter out only the proposals that are pending
-    pending_proposals = [p for p in st.session_state['proposals']]
-    
-    # Display the proposals in a table
-    for proposal in pending_proposals:
-        st.write(proposal['name'], proposal['project_name'], proposal['status'])
-        
+# def pending_approval_page():
+#     st.subheader("Pending Approval")
+#     df = pd.DataFrame(st.session_state.proposals)
+#     st.write(df)
 
+def submit_proposal(proposal_data):
+    st.session_state['proposals'].append(proposal_data)
+    st.success("Proposal submitted successfully!")
+
+def approve_proposal(index):
+    proposal = st.session_state['proposals'].pop(index)
+    st.session_state['approved'].append(proposal)
+    st.experimental_rerun()
+
+def reject_proposal(index):
+    proposal = st.session_state['proposals'].pop(index)
+    st.session_state['rejected'].append(proposal)
+    st.experimental_rerun()
+
+def pending_approval_page():
+    if st.session_state['proposals']:
+        for index, proposal in enumerate(st.session_state['proposals']):
+            st.write(proposal)
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Yes", key=f"approve_{index}"):
+                    approve_proposal(index)
+            with col2:
+                if st.button("No", key=f"reject_{index}"):
+                    reject_proposal(index)
+    else:
+        st.write("No pending proposals")
+
+def show_approved():
+    df_approved = pd.DataFrame(st.session_state.approved)
+    st.write(df_approved)
+def show_rejected():
+    df_rejected = pd.DataFrame(st.session_state.rejected)
+    st.write(df_rejected)
 
 def main():
     st.title("Data Science Capstone Website")
@@ -87,6 +119,7 @@ def main():
     elif page == "Approved Projects":
         st.subheader("Approved Projects")
         # Display approval/rejection interface here
+        show_approved()
     elif page == "Completion":
         st.subheader("Completion")
         # Display approval/rejection interface here
