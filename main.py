@@ -43,7 +43,7 @@ def proposal_request_form():
             contributors = st.text_input("Contributors")
 
         with right_col:
-            semester = st.selectbox("Semester", options=["Spring", "Summer", "Fall", "Winter"])
+            semester = st.selectbox("Semester", options=["Spring", "Summer", "Fall"])
             expected_students = st.number_input("Expected number of students", min_value=1, value=1)
             mentor_email = st.text_input("Mentor email")
             dataset = st.text_area("Dataset")
@@ -193,6 +193,7 @@ def pending_completion():
 
 
 def main():
+    st.image('gw-data-science-header.jpg', use_column_width=True)
     st.title("Data Science Capstone Website")
     page = st.selectbox("Navigate to:", ["Proposal Request", "Pending Approval", "Rejected", "Approved Projects", "Project Completion Form","Project completion aprroval", "Pending Completion", "Completed Projects"], index=0)
 
