@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import subprocess
+import os
 # Initialize session state for storing proposals if it doesn't exist
 if 'proposals' not in st.session_state:
     st.session_state['proposals'] = []
@@ -221,7 +223,24 @@ def format_proposal_as_markdown(proposal):
     return markdown_template
 
             
-            
+def clone_github_repo(git_link, local_dir=""):
+   
+    # Ensure the local directory exists
+    if local_dir and not os.path.exists(local_dir):
+        os.makedirs(local_dir)
+
+    # Change the current working directory to the specified local directory
+    if local_dir:
+        os.chdir(local_dir)
+
+    # Execute the git clone command
+    try:
+        subprocess.check_call(['git', 'clone', git_link])
+        print(f"Repository cloned successfully in: {os.path.abspath(local_dir)}")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to clone repository: {e}")
+
+       
 
 
 
@@ -329,12 +348,16 @@ def pending_completion():
 
 
 def main():
-    st.image('gw-data-science-header.jpg', use_column_width=True)
+    st.image("gw-data-science-header.jpg", use_column_width=True)
     st.title("Data Science Capstone Website")
     page = st.selectbox("Navigate to:", ["Proposal Request", "Pending Approval","Edit Proposals", "Rejected", "Approved Projects", "Project Completion Form","Project completion aprroval", "Pending Completion", "Completed Projects"], index=0)
 
     if page == "Proposal Request":
         proposal_request_form()
+        # Example usage
+        # git_link = "https://github.com/amir-jafari/Capstone/tree/main/Data-Science-Capstone-Website"  
+        # local_dir = "D://Capstone Website - streamlit//Data-Science-Capstone-Website//github clones"  
+        # clone_github_repo(git_link, local_dir)     
 
     elif page == "Pending Approval":
         st.subheader("Pending Approval")
