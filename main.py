@@ -499,26 +499,26 @@ def show_to_edit_completion():
                 submitted = st.form_submit_button("Submit")
                 
                 if submitted:
-                            data_edit = {
-                                "project_title": project_title,
-                                "video_link": video_link,
-                                "github_link": github_link,
-                                "github_link": github_link,
-                                "website": website,
-                                "doocument": doocument,
-                            }
-                            # Update the appropriate proposal in the session state
-                            st.session_state.edit_completion[index] = data_edit
-                            # Reset flags to hide the form
-                            st.session_state['show_edit_form'] = False
-                            st.session_state['editing_index'] = None
+                        data_edit = {
+                            "project_title": project_title,
+                            "video_link": video_link,
+                            "github_link": github_link,
+                            "github_link": github_link,
+                            "website": website,
+                            "doocument": doocument,
+                        }
+                        # Update the appropriate proposal in the session state
+                        st.session_state.edit_completion[index] = data_edit
+                        # Reset flags to hide the form
+                        st.session_state['show_edit_form'] = False
+                        st.session_state['editing_index'] = None
 
-                            # Optionally, you can move the updated proposal back to the 'proposals' list
-                            updated_proposal = st.session_state.edit_completion.pop(index)
-                            st.session_state.completion.append(updated_proposal)
+                        # Optionally, you can move the updated proposal back to the 'proposals' list
+                        updated_proposal = st.session_state.edit_completion.pop(index)
+                        st.session_state.completion.append(updated_proposal)
 
-                            # Rerun the app to refresh the state and UI
-                            st.rerun() 
+                        # Rerun the app to refresh the state and UI
+                        st.rerun() 
 
 
 
