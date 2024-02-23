@@ -3,6 +3,10 @@ import pandas as pd
 import numpy as np
 import subprocess
 import os
+from PIL import Image
+import io
+import base64
+from io import BytesIO
 # Initialize session state for storing proposals if it doesn't exist
 if 'proposals' not in st.session_state:
     st.session_state['proposals'] = []
@@ -28,16 +32,28 @@ if 'editing_index' not in st.session_state:
     st.session_state.editing_index = None
 if 'show_edit_form' not in st.session_state:
     st.session_state.show_edit_form = None
+if 'objective_image_up' not in st.session_state:
+    st.session_state.objective_image_up = None
+if 'dataset_image_up' not in st.session_state:
+    st.session_state.dataset_image_up = None
+if 'possible_issues_image_up' not in st.session_state:
+    st.session_state.possible_issues_image_up = None
 
-
-
-
-def submit_proposal(proposal_data):
-    # Here you would implement saving the proposal data to a database or another storage
-    # For simplicity, we're appending it to the session state
-    st.session_state['proposals'].append(proposal_data)
+# Function to save the uploaded Word document to the session state
+def save_objective_photo(objective_file,dataset_file,possible_issues_file):
     
-    st.success("Proposal submitted successfully!")
+    if objective_file is not None:
+        # Read the file data into a bytes object
+        st.session_state.objective_image_up = objective_file.getvalue()
+        st.success(f"Uploaded {objective_file.name} successfully.")
+    if dataset_file is not None:
+        # Read the file data into a bytes object
+        st.session_state.dataset_image_up = dataset_file.getvalue()
+        st.success(f"Uploaded {dataset_file.name} successfully.")
+    if possible_issues_file is not None:
+        # Read the file data into a bytes object
+        st.session_state.possible_issues_image_up = possible_issues_file.getvalue()
+        st.success(f"Uploaded {possible_issues_file.name} successfully.")
 
 
 def proposal_request_form():
@@ -51,6 +67,7 @@ def proposal_request_form():
             mentor = st.text_input("Mentor for the project")
             github_link = st.text_input("Github Link")
             objective = st.text_area("Objective")
+            objective_image = st.file_uploader("Upload an image for objective if needed", type=["jpg", "jpeg", "png"],key="objective_image")
             rationale = st.text_area("Rationale")
             timeline = st.text_area("Timeline")
             contributors = st.text_input("Contributors")
@@ -60,19 +77,27 @@ def proposal_request_form():
             expected_students = st.number_input("Expected number of students", min_value=1, value=1)
             mentor_email = st.text_input("Mentor email")
             dataset = st.text_area("Dataset")
+            dataset_image = st.file_uploader("Upload an image for dataset", type=["jpg", "jpeg", "png"], key="dataset_image")
             approach = st.text_area("Approach")
             possible_issues = st.text_area("Possible Issues")
+            possible_issues_image = st.file_uploader("Upload an image for possible issues", type=["jpg", "jpeg", "png"],key="possible_issues_image")
             year = st.selectbox("Year", options=["2021", "2022", "2023", "2024"])
-
-        submitted = st.form_submit_button("Submit")
         
+       
+
+
+        preview = st.form_submit_button("Preview")
+        submitted = st.form_submit_button("Submit")
+
         if submitted:
+            save_objective_photo(objective_image,dataset_image,possible_issues_image)
             proposal_data = {
                 "name": name,
                 "project_name": project_name,
                 "mentor": mentor,
                 "github_link": github_link,
                 "objective": objective,
+                "objective_image_name" : objective_image.name if objective_image is not None else "Not Uploaded",
                 "rationale": rationale,
                 "timeline": timeline,
                 "contributors": contributors,
@@ -80,21 +105,86 @@ def proposal_request_form():
                 "expected_students": expected_students,
                 "mentor_email": mentor_email,
                 "dataset": dataset,
+                "dataset_image_name" : dataset_image.name if dataset_image is not None else "Not Uploaded",
                 "approach": approach,
                 "possible_issues": possible_issues,
+                "possible_issues_image_name": possible_issues_image.name if possible_issues_image is not None else "Not Uploaded",
                 "year": year,
+                
             }
             # proposal_data = pd.DataFrame.from_dict(proposal_data, orient = "index")
             submit_proposal(proposal_data)
-# Function to display pending proposals
-# def pending_approval_page():
-#     st.subheader("Pending Approval")
-#     df = pd.DataFrame(st.session_state.proposals)
-#     st.write(df)
+
+        # Initialize variable names with default values
+        objective_image_name = "Not Uploaded"
+        dataset_image_name = "Not Uploaded"
+        possible_issues_image_name = "Not Uploaded"
+
+        if preview:
+            if objective_image is not None:
+                st.session_state.objective_image_up = objective_image.getvalue()
+                objective_image_name = objective_image.name
+            # No else part needed since default value is already set
+
+            if dataset_image is not None:
+                st.session_state.dataset_image_up = dataset_image.getvalue()
+                dataset_image_name = dataset_image.name
+            # No else part needed since default value is already set
+
+            if possible_issues_image is not None:
+                st.session_state.possible_issues_image_up = possible_issues_image.getvalue()
+                possible_issues_image_name = possible_issues_image.name
+            # No else part needed since default value is already set
+        
+
+            preview_data = {
+                "name": name,
+                "project_name": project_name,
+                "mentor": mentor,
+                "github_link": github_link,
+                "objective": objective,
+                "objective_image_name" : objective_image_name,
+                "rationale": rationale,
+                "timeline": timeline,
+                "contributors": contributors,
+                "semester": semester,
+                "expected_students": expected_students,
+                "mentor_email": mentor_email,
+                "dataset": dataset,
+                "dataset_image_name" : dataset_image_name,
+                "approach": approach,
+                "possible_issues": possible_issues,
+                "possible_issues_image_name": possible_issues_image_name ,
+                "year": year,
+
+            }
+        
+            st.markdown(format_proposal_as_markdown(preview_data), unsafe_allow_html=True)
+            # with st.expander("Preview Your Proposal"):
+            #     with left_col:
+            #         st.write(f"**Name:** {name}")
+            #         st.write(f"**Project Name:** {project_name}")
+            #         st.write(f"**Mentor:** {mentor}")
+            #         st.write(f"**Github Link:** {github_link}")
+            #         st.write(f"**Objective:** {objective}")
+            #         st.write(f"**Rationale:** {rationale}")
+            #         st.write(f"**Timeline:** {timeline}")
+            #         st.write(f"**Contributors:** {contributors}")
+            #     with right_col:
+            #         st.write(f"**Semester:** {semester}")
+            #         st.write(f"**Expected Students:** {expected_students}")
+            #         st.write(f"**Dataset:** {dataset}")
+            #         st.write(f"**Possible Issues:** {possible_issues}")
+            #         st.write(f"**Year:** {year}")
+
+
+
+
 
 def submit_proposal(proposal_data):
     st.session_state['proposals'].append(proposal_data)
     st.success("Proposal submitted successfully!")
+
 
 def approve_proposal(index):
     proposal = st.session_state['proposals'].pop(index)
@@ -184,7 +274,55 @@ def show_to_edit_proposals():
                             # Rerun the app to refresh the state and UI
                             st.rerun() 
 
+# Function to convert PIL image to Base64
+def pil_image_to_base64(image):
+    img_buffer = BytesIO()
+    image.save(img_buffer, format="JPEG")  # You can change 'JPEG' to 'PNG' if needed
+    base64_img = base64.b64encode(img_buffer.getvalue()).decode()
+    return f"data:image/jpeg;base64,{base64_img}"
+def resize_image(image, width=300):
+    # Calculate the target height to maintain the aspect ratio
+    # Calculate the target height to maintain the aspect ratio
+    aspect_ratio = image.height / image.width
+    target_height = int(aspect_ratio * width)
+    return image.resize((width, target_height))
+
 def format_proposal_as_markdown(proposal):
+
+
+    # Open the image from session state and convert to Base64
+    if st.session_state.objective_image_up is not None:
+        image_bytes_io = io.BytesIO(st.session_state.objective_image_up)
+        image_obj = Image.open(image_bytes_io)
+        resized_image = resize_image(image_obj)
+        base64_image = pil_image_to_base64(resized_image)
+        image_markdown_obj = f"![Uploaded Image]({base64_image})"
+    else:
+        image_markdown_obj = "No image uploaded"
+    
+    
+    # Open the image from session state and convert to Base64
+    if st.session_state.dataset_image_up is not None:
+        image_bytes_io = io.BytesIO(st.session_state.dataset_image_up)
+        image_data = Image.open(image_bytes_io)
+        resized_image = resize_image(image_data)
+        base64_image = pil_image_to_base64(resized_image)
+        image_markdown_data = f"![Uploaded Image]({base64_image})"
+    else:
+        image_markdown_data = "No image uploaded"
+
+    # Open the image from session state and convert to Base64
+    if st.session_state.possible_issues_image_up is not None:
+        image_bytes_io = io.BytesIO(st.session_state.possible_issues_image_up)
+        image_issue = Image.open(image_bytes_io)
+        resized_image = resize_image(image_issue)
+        base64_image = pil_image_to_base64(resized_image)
+        image_markdown_issue = f"![Uploaded Image]({base64_image})"
+    else:
+        image_markdown_issue = "No image uploaded"
+
+
+    # Embed the Base64 image string in the Markdown template
     markdown_template = f"""
 # Capstone Proposal
 ## {proposal["project_name"]}
@@ -194,26 +332,32 @@ def format_proposal_as_markdown(proposal):
 #### George Washington University  
 #### Data Science Program
 
-## 1 Objective:
+## 1. Objective:
 {proposal["objective"]}
 
-## 2 Dataset:
+
+{image_markdown_obj}
+## 2. Dataset:
 {proposal["dataset"]}
 
-## 3 Rationale:
+
+{image_markdown_data}
+## 3. Rationale:
 {proposal["rationale"]}
 
-## 4 Approach:
+## 4. Approach:
 {proposal["approach"]}
 
-## 5 Timeline:
+## 5. Timeline:
 {proposal["timeline"]}
 
-## 6 Expected Number of Students:
+## 6. Expected Number of Students:
 {proposal["expected_students"]}
 
-## 7 Possible Issues:
+## 7. Possible Issues:
 {proposal["possible_issues"]}
+
+{image_markdown_issue}
 
 ## Contact
 - Author: {proposal["name"]}
@@ -225,15 +369,11 @@ def format_proposal_as_markdown(proposal):
             
 def clone_github_repo(git_link, local_dir=""):
    
-    # Ensure the local directory exists
+
     if local_dir and not os.path.exists(local_dir):
         os.makedirs(local_dir)
-
-    # Change the current working directory to the specified local directory
     if local_dir:
         os.chdir(local_dir)
-
-    # Execute the git clone command
     try:
         subprocess.check_call(['git', 'clone', git_link])
         print(f"Repository cloned successfully in: {os.path.abspath(local_dir)}")
@@ -285,7 +425,7 @@ def completion_form():
     st.subheader("Project Completion Form")
     with st.form(key='completion_form'):
         # You can add other input fields as necessary
-        project_title = st.text_input("Paper Title")
+        project_title = st.text_input("Project Title")
         video_link = st.text_input("Video Link")
         github_repo = st.text_input("GitHub Repository")
         project_website = st.text_input("Project Website Link if available")
@@ -304,7 +444,7 @@ def completion_form():
                 "Video Link" : video_link,
                 "github repo" : github_repo,
                 "project website": project_website,
-                "Project Document" : uploaded_file.name
+                "Project Document" : uploaded_file.name if uploaded_file is not None else "File not uploaded"
             }
             submit_completion(completion)
 
@@ -326,17 +466,69 @@ def edit_completion(index):
 def show_approved_completion():
     df_approved = pd.DataFrame(st.session_state.approved_completion)
     st.write(df_approved)
+
+
+    
 def show_to_edit_completion():
     df_edit = pd.DataFrame(st.session_state.edit_completion)
     st.write(df_edit)
+
+    for index, row in df_edit.iterrows():
+        # The unique key for each button is created by appending the index to a base string
+        if st.button(f"Edit {row['project title']}", key=f"button_{index}"):
+            # Save the index of the proposal being edited
+            st.session_state['editing_index'] = index
+            # Use Streamlit's session state to display the form
+            st.session_state['show_edit_form'] = True
+            # Break the loop to prevent more than one form from showing
+            break
+    # Check if we should display the editing form
+    if st.session_state.get('show_edit_form', False):
+        # Obtain the index of the proposal being edited
+        index = st.session_state['editing_index']
+        row = df_edit.loc[index]
+
+        with st.form(key='edit_proposal_form'):
+                st.subheader("Edit Completion Form")
+                project_title = st.text_input("Name",value=df_edit.loc[index,"project title"])
+                video_link = st.text_input("Video Link",value=df_edit.loc[index,"Video Link"])
+                github_link = st.text_input("github repo",value=df_edit.loc[index,"github repo"])
+                website = st.text_input("project website",value=df_edit.loc[index,"project website"])
+                doocument = st.text_area("Project Document",value=df_edit.loc[index,"Project Document"])
+
+                submitted = st.form_submit_button("Submit")
+                
+                if submitted:
+                            data_edit = {
+                                "project_title": project_title,
+                                "video_link": video_link,
+                                "github_link": github_link,
+                                "github_link": github_link,
+                                "website": website,
+                                "doocument": doocument,
+                            }
+                            # Update the appropriate proposal in the session state
+                            st.session_state.edit_completion[index] = data_edit
+                            # Reset flags to hide the form
+                            st.session_state['show_edit_form'] = False
+                            st.session_state['editing_index'] = None
+
+                            # Optionally, you can move the updated proposal back to the 'proposals' list
+                            updated_proposal = st.session_state.edit_completion.pop(index)
+                            st.session_state.completion.append(updated_proposal)
+
+                            # Rerun the app to refresh the state and UI
+                            st.rerun() 
+
+
 
 
 
 def pending_completion():
     if st.session_state['completion']:
         for index, completion in enumerate(st.session_state['completion']):
-            st.write(completion)
-            col1, col2 = st.columns()
+            st.table(completion)
+            col1, col2 = st.columns(2)
             with col1:
                 if st.button("Yes", key=f"approve_{index}"):
                     approve_completion(index)
@@ -350,49 +542,151 @@ def pending_completion():
 def main():
     st.image("gw-data-science-header.jpg", use_column_width=True)
     st.title("Data Science Capstone Website")
-    page = st.selectbox("Navigate to:", ["Proposal Request", "Pending Approval","Edit Proposals", "Rejected", "Approved Projects", "Project Completion Form","Project completion aprroval", "Pending Completion", "Completed Projects"], index=0)
+    # page = st.selectbox("Navigate to:", ["Proposal Request", "Pending Approval","Edit Proposals", "Rejected", "Approved Projects", "Project Completion Form","Project completion aprroval", "Pending Completion", "Completed Projects"], index=0)
+    # Initialize active_page in session_state if not present
+    if 'active_page' not in st.session_state:
+        st.session_state.active_page = None
 
-    if page == "Proposal Request":
-        proposal_request_form()
-        # Example usage
-        # git_link = "https://github.com/amir-jafari/Capstone/tree/main/Data-Science-Capstone-Website"  
-        # local_dir = "D://Capstone Website - streamlit//Data-Science-Capstone-Website//github clones"  
-        # clone_github_repo(git_link, local_dir)     
+    projects_options = ["Proposal Request  ",
+                        "Pending Approval  ",
+                        "Edit Proposals    ",
+                        "Rejected          ",
+                        "Approved Projects "]
+    completed_projects_options = ["Project Completion Form    ",
+                                  "Project Completion Approval",
+                                  "Edit Project Completion    ",
+                                  "Completed Projects         "]
+    # Create columns in the sidebar for Projects and Completed Projects
+    col1, col2 = st.sidebar.columns(2)
 
-    elif page == "Pending Approval":
-        st.subheader("Pending Approval")
-        pending_approval_page()
+    with col1:
+        st.markdown("### Projects")
 
-    elif page == "Edit Proposals":
-        st.subheader("Edit Proposals")
-        show_to_edit_proposals()
+        for option in projects_options:
+            if st.button(option.strip()):
+                st.session_state.active_page = option.strip()
+
+    with col2:
+        st.markdown("### Completed Projects")
+        for option in completed_projects_options:
+            if st.button(option.strip(), key=option):  # Ensure unique keys for buttons
+                st.session_state.active_page = option.strip()
+
+
+
+     # Convert proposals to DataFrame for easier manipulation
+    proposals_df = pd.DataFrame(st.session_state['approved'])
+
+
+    # Collect unique values for filters
+    unique_semesters = proposals_df['semester'].unique().tolist()
+    unique_project_names = proposals_df['project_name'].unique().tolist()
+    unique_years = proposals_df['year'].unique().tolist()
+
+    # Sidebar filters
+    selected_semester = st.sidebar.selectbox("Filter by Semester:", ['All'] + unique_semesters)
+    selected_project_name = st.sidebar.selectbox("Filter by Project Name:", ['All'] + unique_project_names)
+    selected_year = st.sidebar.selectbox("Filter by Year:", ['All'] + unique_years)
+
+    # Filter proposals based on selected criteria
+    filtered_proposals = proposals_df
+    if selected_semester != 'All':
+        filtered_proposals = filtered_proposals[filtered_proposals['semester'] == selected_semester]
+    if selected_project_name != 'All':
+        filtered_proposals = filtered_proposals[filtered_proposals['project_name'] == selected_project_name]
+    if selected_year != 'All':
+        filtered_proposals = filtered_proposals[filtered_proposals['year'] == selected_year]
+
+    # Display content based on the active page
+    if st.session_state.active_page:
+        # Display the appropriate page based on the active_page
+        if st.session_state.active_page == "Proposal Request":
+            proposal_request_form()
+
+        elif st.session_state.active_page == "Pending Approval":
+            st.subheader("Pending Approval")
+            pending_approval_page()
+        elif st.session_state.active_page == "Edit Proposals":
+            st.subheader("Edit Proposals")
+            show_to_edit_proposals()
+        elif st.session_state.active_page == "Rejected":
+            st.subheader("Rejected Proposals")
+            show_rejected()
+        elif st.session_state.active_page == "Approved Projects":
+            st.subheader("Approved Proposals")
+                # Define default columns to display
+            default_columns = ["name", "project_name", "mentor", "objective", "rationale", "semester", "year"]
+            # Define additional columns that can be added to the display
+            additional_columns = ["expected_students", "github_link", "dataset"]
+
+            # Use a multiselect widget to allow users to select additional columns to display
+            selected_columns = st.multiselect("Select additional columns to display:", additional_columns)
+
+            # Combine default columns with selected additional columns
+            columns_to_display = default_columns + selected_columns
+            st.write(filtered_proposals[columns_to_display])
+
+        elif st.session_state.active_page == "Project Completion Form":
+            completion_form()
+        elif st.session_state.active_page == "Project Completion Approval":
+            st.subheader("Project Completion Approval")
+            pending_completion()
+        elif st.session_state.active_page == "Edit Project Completion":
+            st.subheader("Edit Project Completion")
+            show_to_edit_completion()
+        elif st.session_state.active_page == "Completed Projects":
+            st.subheader("Project Completion Approval")
+            show_approved_completion()
+
+    else:
+        st.write("Select an option from the sidebar.")
+
+
+    # if selected_project == "Proposal Request":
+    #     proposal_request_form()
    
-    elif page == "Rejected":
-        st.subheader("Rejected")
-        show_rejected()
-  
-    elif page == "Approved Projects":
-        st.subheader("Approved Projects")
-    
-        show_approved()
-    elif page == "Project Completion Form":
+    #     # git_link = "https://github.com/Renga-99/Stroke-Prediction"  
+    #     # local_dir = "D://Capstone Website - streamlit//Data-Science-Capstone-Website//github clones"  
+    #     # clone_github_repo(git_link, local_dir)     
 
-        completion_form()
-        # Display info about the uploaded file (if any)
-        if st.session_state['uploaded_word_doc'] is not None:
-            st.write(f"Uploaded Word document: {st.session_state['uploaded_word_doc_name']}")
-    elif page == "Project completion aprroval":
-        st.subheader("Project completion aprroval")
-        pending_completion()
+    # elif selected_project == "Pending Approval":
+    #     st.subheader("Pending Approval")
+    #     pending_approval_page()
 
-    elif page == "Pending Completion":
-        st.subheader("Pending Completion")
-        show_to_edit_completion()
+    # elif selected_project == "Edit Proposals":
+    #     st.subheader("Edit Proposals")
+    #     show_to_edit_proposals()
+   
+    # elif selected_project == "Rejected":
+    #     st.subheader("Rejected")
+    #     show_rejected()
+  
+    # elif selected_project == "Approved Projects":
+    #     st.subheader("Approved Projects")
+        
+    #     # Display filtered proposals
+    #     for index, proposal in filtered_proposals.iterrows():
+    #         st.write(proposal) 
+    
+    #     # show_approved()
+    # elif selected_completed_project == "Project Completion Form":
+
+    #     completion_form()
+    #     # Display info about the uploaded file (if any)
+    #     if st.session_state['uploaded_word_doc'] is not None:
+    #         st.write(f"Uploaded Word document: {st.session_state['uploaded_word_doc_name']}")
+    # elif selected_completed_project == "Project completion aprroval":
+    #     st.subheader("Project completion aprroval")
+    #     pending_completion()
+
+    # elif selected_completed_project == "Pending Completion":
+    #     st.subheader("Pending Completion")
+    #     show_to_edit_completion()
   
     
-    elif page == "Completed Projects":
-        st.subheader("Completed Projects")
-        show_approved_completion()
+    # elif selected_completed_project == "Completed Projects":
+    #     st.subheader("Completed Projects")
+    #     show_approved_completion()
 
 
 if __name__ == "__main__":
