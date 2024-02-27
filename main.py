@@ -6,7 +6,9 @@ import os
 from PIL import Image
 import io
 import base64
+import shutil
 from io import BytesIO
+import stat
 # Initialize session state for storing proposals if it doesn't exist
 if 'proposals' not in st.session_state:
     st.session_state['proposals'] = []
@@ -380,9 +382,59 @@ def clone_github_repo(git_link, local_dir=""):
     except subprocess.CalledProcessError as e:
         print(f"Failed to clone repository: {e}")
 
-       
+def on_rm_error(func, path, exc_info):
+    # Error handler for shutil.rmtree
+    if not os.access(path, os.W_OK):
+        os.chmod(path, stat.S_IWUSR)
+        func(path)
+    else:
+        raise
 
+def clone_and_push_repo(git_link, local_dir="", new_repo_git_link="", new_branch_name="archive-update"):
+    original_dir = os.getcwd()  # Save the original directory
+    repo_name = git_link.split('/')[-1].replace('.git', '')  # Extract repo name from git link
 
+    if local_dir and not os.path.exists(local_dir):
+        os.makedirs(local_dir)
+
+    repo_path = os.path.join(local_dir, repo_name)
+
+    try:
+        subprocess.check_call(['git', 'clone', git_link, repo_path])
+        os.chdir(repo_path)
+
+        # Set the remote to the target repository
+        subprocess.check_call(['git', 'remote', 'add', 'upstream', new_repo_git_link])
+
+        # Fetch the latest changes from the upstream repository
+        subprocess.check_call(['git', 'fetch', 'upstream'])
+
+        # Checkout to a new branch from the upstream main
+        subprocess.check_call(['git', 'checkout', '-b', new_branch_name, 'upstream/main'])
+
+        # Create the Archive folder and move contents into it
+        archive_path = os.path.join(repo_path, 'Archive')
+        if not os.path.exists(archive_path):
+            os.makedirs(archive_path, exist_ok=True)
+        for item in os.listdir(repo_path):
+            if item not in ['Archive', '.git']:
+                shutil.move(os.path.join(repo_path, item), archive_path)
+
+        # Add and commit the changes
+        subprocess.check_call(['git', 'add', '--all'])
+        subprocess.check_call(['git', 'commit', '-m', 'Initial commit'])
+
+        # Push the new branch with changes to the upstream repository
+        subprocess.check_call(['git', 'push', '-u', 'upstream', new_branch_name])
+
+        print(f"Changes pushed to new branch: {new_branch_name} in {new_repo_git_link}.")
+        print(f"Please create a pull request on GitHub to merge {new_branch_name} into main.")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to process repository: {e}")
+    finally:
+        os.chdir(original_dir)  # Change back to the original directory
+        if os.path.exists(repo_path):
+            shutil.rmtree(repo_path, onerror=on_rm_error)  # Use the error handler
 
 def pending_approval_page():
 
@@ -494,31 +546,33 @@ def show_to_edit_completion():
                 video_link = st.text_input("Video Link",value=df_edit.loc[index,"Video Link"])
                 github_link = st.text_input("github repo",value=df_edit.loc[index,"github repo"])
                 website = st.text_input("project website",value=df_edit.loc[index,"project website"])
-                doocument = st.text_area("Project Document",value=df_edit.loc[index,"Project Document"])
+                # Word document upload field
+                document = st.file_uploader("Upload your project document", type=['docx'])
 
                 submitted = st.form_submit_button("Submit")
                 
                 if submitted:
-                        data_edit = {
-                            "project_title": project_title,
-                            "video_link": video_link,
-                            "github_link": github_link,
-                            "github_link": github_link,
-                            "website": website,
-                            "doocument": doocument,
-                        }
-                        # Update the appropriate proposal in the session state
-                        st.session_state.edit_completion[index] = data_edit
-                        # Reset flags to hide the form
-                        st.session_state['show_edit_form'] = False
-                        st.session_state['editing_index'] = None
+                    save_uploaded_file(document)
+                    data_edit = {
+                        "project_title": project_title,
+                        "video_link": video_link,
+                        "github_link": github_link,
+                        "github_link": github_link,
+                        "website": website,
+                        "document": document.name if document is not None else "File not uploaded",
+                    }
+                    # Update the appropriate proposal in the session state
+                    st.session_state.edit_completion[index] = data_edit
+                    # Reset flags to hide the form
+                    st.session_state['show_edit_form'] = False
+                    st.session_state['editing_index'] = None
 
-                        # Optionally, you can move the updated proposal back to the 'proposals' list
-                        updated_proposal = st.session_state.edit_completion.pop(index)
-                        st.session_state.completion.append(updated_proposal)
+                    # Optionally, you can move the updated proposal back to the 'proposals' list
+                    updated_proposal = st.session_state.edit_completion.pop(index)
+                    st.session_state.completion.append(updated_proposal)
 
-                        # Rerun the app to refresh the state and UI
-                        st.rerun() 
+                    # Rerun the app to refresh the state and UI
+                    st.rerun() 
 
 
 
@@ -542,6 +596,9 @@ def pending_completion():
 def main():
     st.image("gw-data-science-header.jpg", use_column_width=True)
     st.title("Data Science Capstone Website")
+    # git_link = 'https://github.com/mecaneer23/python-snake-game.git'
+    # local_dir = 'D://Capstone Website - streamlit/Data-Science-Capstone-Website/github clones'
+    # new_repo_git_link = 'https://github.com/amir-jafari/Capstone.git'
     # page = st.selectbox("Navigate to:", ["Proposal Request", "Pending Approval","Edit Proposals", "Rejected", "Approved Projects", "Project Completion Form","Project completion aprroval", "Pending Completion", "Completed Projects"], index=0)
     # Initialize active_page in session_state if not present
     if 'active_page' not in st.session_state:
@@ -560,7 +617,7 @@ def main():
     col1, col2 = st.sidebar.columns(2)
 
     with col1:
-        st.markdown("### Projects")
+        st.markdown("### Projects & Proposals")
 
         for option in projects_options:
             if st.button(option.strip()):
@@ -572,9 +629,11 @@ def main():
             if st.button(option.strip(), key=option):  # Ensure unique keys for buttons
                 st.session_state.active_page = option.strip()
 
+# Example usage
 
+# clone_and_push_repo(git_link, local_dir, new_repo_git_link)
 
-     # Convert proposals to DataFrame for easier manipulation
+    # Convert proposals to DataFrame for easier manipulation
     proposals_df = pd.DataFrame(st.session_state['approved'])
 
 
@@ -584,8 +643,8 @@ def main():
     unique_years = proposals_df['year'].unique().tolist()
 
     # Sidebar filters
-    selected_semester = st.sidebar.selectbox("Filter by Semester:", ['All'] + unique_semesters)
     selected_project_name = st.sidebar.selectbox("Filter by Project Name:", ['All'] + unique_project_names)
+    selected_semester = st.sidebar.selectbox("Filter by Semester:", ['All'] + unique_semesters)
     selected_year = st.sidebar.selectbox("Filter by Year:", ['All'] + unique_years)
 
     # Filter proposals based on selected criteria
@@ -615,16 +674,17 @@ def main():
         elif st.session_state.active_page == "Approved Projects":
             st.subheader("Approved Proposals")
                 # Define default columns to display
-            default_columns = ["name", "project_name", "mentor", "objective", "rationale", "semester", "year"]
+            default_columns = ["name", "project_name", "mentor", "objective", "semester", "year"]
             # Define additional columns that can be added to the display
-            additional_columns = ["expected_students", "github_link", "dataset"]
+            additional_columns = ["rationale","expected_students", "github_link", "dataset","timeline","approach","possible_issues"] 
 
             # Use a multiselect widget to allow users to select additional columns to display
             selected_columns = st.multiselect("Select additional columns to display:", additional_columns)
 
             # Combine default columns with selected additional columns
             columns_to_display = default_columns + selected_columns
-            st.write(filtered_proposals[columns_to_display])
+
+            st.table(filtered_proposals[columns_to_display])
 
         elif st.session_state.active_page == "Project Completion Form":
             completion_form()
@@ -637,6 +697,7 @@ def main():
         elif st.session_state.active_page == "Completed Projects":
             st.subheader("Project Completion Approval")
             show_approved_completion()
+            # clone_and_push_repo(git_link, local_dir, new_repo_git_link)
 
     else:
         st.write("Select an option from the sidebar.")
